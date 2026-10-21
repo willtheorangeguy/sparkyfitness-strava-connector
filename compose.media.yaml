@@ -1,0 +1,28 @@
+# Experimental milestone only. Production sync is not connected to this service.
+name: sparkyfitness-strava-media-preview
+x-media: &media
+  build:
+    context: .
+    dockerfile: Dockerfile.media
+  image: sparkyfitness-strava-connector-media:local
+  init: true
+  shm_size: 1gb
+  volumes:
+    - ./src:/app/src:ro
+    - browser_profile:/browser-profile
+    - ./design/previews:/previews
+services:
+  preview:
+    <<: *media
+    # This offline developer renderer writes to the host checkout on Linux too.
+    user: '0:0'
+    entrypoint: [python, -m, sparkyfitness_strava.media.render]
+    command: [--output, /previews]
+  media-login:
+    <<: *media
+    command: [login]
+    stop_grace_period: 30s
+    profiles: [login]
+    ports: ['127.0.0.1:6080:6080']
+volumes:
+  browser_profile:

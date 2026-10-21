@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.venv/
+build/
+dist/
+release-assets/
+design/previews/*.html
+runtime/*
+!runtime/.gitkeep
+reports/*
+!reports/.gitkeep

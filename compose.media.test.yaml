@@ -1,0 +1,30 @@
+name: sparkyfitness-strava-media-tests
+services:
+  mock-strava-web:
+    image: python:3.12.13-alpine
+    command: [python, /tests/mock_site.py]
+    volumes: ['./tests/media:/tests:ro']
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.media
+    image: sparkyfitness-strava-connector-media:local
+    user: '0:0'
+    shm_size: 1gb
+    init: true
+    entrypoint: [python, -m, pytest]
+    command: [-q, /app/tests/media, --junitxml=/reports/media-tests.xml]
+    environment:
+      PYTHONPATH: /app/src
+      MOCK_WEB_URL: http://mock-strava-web:8080
+    volumes:
+      - ./src:/app/src:ro
+      - ./tests/media:/app/tests/media:ro
+      - ./reports:/reports
+    depends_on:
+      mock-strava-web: {condition: service_healthy}

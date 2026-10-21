@@ -1,0 +1,14 @@
+Aircraft carrier artwork in comparison_art.py (carrier entry)
+
+Adapted from: Flugzeugtrager Silhouette (version 2).svg
+Author: TheFrenchKing
+Source: https://commons.wikimedia.org/wiki/File:Flugzeugtr%C3%A4ger_Silhouette_(version_2).svg
+Author page: https://commons.wikimedia.org/wiki/User:TheFrenchKing
+License: Creative Commons Attribution-ShareAlike 4.0 International
+https://creativecommons.org/licenses/by-sa/4.0/
+Legal code: https://creativecommons.org/licenses/by-sa/4.0/legalcode
+
+Changes: resized silhouette, theme colors, hull shading and openings,
+bridge windows, parked aircraft, and water lines.
+The adapted carrier illustration is also licensed under CC BY-SA 4.0.
+This notice applies to the carrier illustration, not the surrounding Python code.

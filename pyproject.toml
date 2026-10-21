@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=77,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sparkyfitness-strava-connector"
+version = "0.1.0"
+description = "Export completed sparkyfitness strength sessions to Strava with structured exercises"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = ["httpx==0.28.1", "tzdata==2026.5; sys_platform == 'win32'"]
+
+[project.scripts]
+sparkyfitness-strava = "sparkyfitness_strava.cli:main"
+
+[tool.setuptools.package-data]
+sparkyfitness_strava = ["exercises.json", "media/assets/*.woff2", "media/assets/*LICENSE*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: uses the Docker sparkyfitness harness and mock Strava server"]

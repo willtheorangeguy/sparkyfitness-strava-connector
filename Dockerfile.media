@@ -1,0 +1,12 @@
+FROM python:3.12.13-slim-bookworm@sha256:4766d8b510c428e595d74b9cc5bbb2fae8e26316fffb4adc89908d79aacd58a2
+RUN apt-get update && apt-get install -y --no-install-recommends xvfb x11vnc novnc websockify && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY requirements.media.lock ./
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+RUN pip install --no-cache-dir -r requirements.media.lock && playwright install --with-deps --no-shell chromium && chmod -R a+rX /opt/pw-browsers && rm -rf /var/lib/apt/lists/*
+COPY src /app/src
+RUN useradd --create-home --uid 10001 media && mkdir /browser-profile /previews /artifacts && chown media /browser-profile /previews /artifacts && mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+ENV PYTHONPATH=/app/src PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 BROWSER_PROFILE=/browser-profile HOME=/home/media
+USER media
+ENTRYPOINT ["python", "-m", "sparkyfitness_strava.media.browser"]
+CMD ["--help"]

@@ -1,0 +1,15 @@
+# Developer setup: docker compose -f compose.build.yaml up --build -d
+name: sparkyfitness-strava-connector
+services:
+  connector:
+    build: .
+    image: sparkyfitness-strava-connector:local
+    env_file: .env
+    # Run continuously beside the main service and export new eligible workouts.
+    command: [watch]
+    init: true
+    restart: unless-stopped
+    extra_hosts: ['host.docker.internal:host-gateway']
+    volumes: ['state:/data']
+volumes:
+  state:
