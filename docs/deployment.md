@@ -1,5 +1,7 @@
 # Deployment
 
+Current source version `0.2.0` was not yet a published release on 2026-10-22. The overlay below describes the checked-in service arrangement. To use it with a local image, build the core with `compose.build.yaml`, then set `STRAVA_CONNECTOR_IMAGE=sparkyfitness-strava-connector` and `STRAVA_CONNECTOR_VERSION=local` in the source stack's `.env`. Do not pull that local image. Published deployments must use the matched files/version from an existing release.
+
 `docker-compose.yml` pulls a versioned image without a checkout/build. Use with `.env`
 or set `CONNECTOR_IMAGE` / `CONNECTOR_VERSION` for your registry.
 It shares the developer deployment's project and volume; stop one before switching.
@@ -24,7 +26,7 @@ cross-app duplicate prevention is not guaranteed. Visibility follows Strava sett
 `watch` checks immediately, then every 900 seconds by default. It waits at least 300 seconds after the latest completion and activity end, uploads up to ten new workouts per cycle, and polls accepted jobs later. `restart: unless-stopped` resumes the container after process or Docker restarts. Recover uncertain writes explicitly rather than restarting with an empty journal.
 
 ```sh
-docker compose logs -f connector
+docker compose -f compose.build.yaml logs -f connector
 ```
 
 ## State and backups

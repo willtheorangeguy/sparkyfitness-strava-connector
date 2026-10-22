@@ -11,13 +11,13 @@ Export completed native SparkyFitness preset/plan workouts as structured Strava 
 
 ## Quick start
 
-Download the released Compose and environment files and configure your source API key and Strava app, then run:
+Build the current source checkout and configure `.env` as described in [getting started](getting-started.md), then run:
 
 ```sh
-docker compose pull
-docker compose run --rm connector auth-url
-docker compose run --rm -i connector auth-complete
-docker compose run --rm connector preview
+docker compose -f compose.build.yaml build
+docker compose -f compose.build.yaml run --rm connector auth-url
+docker compose -f compose.build.yaml run --rm -i connector auth-complete
+docker compose -f compose.build.yaml run --rm connector preview
 ```
 
 Follow [getting started](getting-started.md) for permissions and the first export.
@@ -37,4 +37,4 @@ Follow [getting started](getting-started.md) for permissions and the first expor
 
 ## Support
 
-Open a [discussion](https://github.com/willtheorangeguy/sparkyfitness-strava-connector/discussions/new) or an [issue](https://github.com/willtheorangeguy/sparkyfitness-strava-connector/issues/new/choose).
+Open an [issue](https://github.com/willtheorangeguy/sparkyfitness-strava-connector/issues/new/choose).

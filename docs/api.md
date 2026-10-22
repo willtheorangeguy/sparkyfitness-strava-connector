@@ -9,7 +9,7 @@ Stop the watcher before stateful commands. Examples with numeric IDs and UUIDs s
 Print consent URL and persist a 15-minute nonce.
 
 ```sh
-docker compose run --rm connector auth-url
+docker compose -f compose.build.yaml run --rm connector auth-url
 ```
 
 ## `auth-complete`
@@ -17,7 +17,7 @@ docker compose run --rm connector auth-url
 Read full callback URL from stdin and store OAuth credentials.
 
 ```sh
-docker compose run --rm -i connector auth-complete
+docker compose -f compose.build.yaml run --rm -i connector auth-complete
 ```
 
 ## `check`
@@ -25,7 +25,7 @@ docker compose run --rm -i connector auth-complete
 Verify source API key owner and Strava athlete bindings.
 
 ```sh
-docker compose run --rm connector check
+docker compose -f compose.build.yaml run --rm connector check
 ```
 
 ## `preview`
@@ -33,7 +33,7 @@ docker compose run --rm connector check
 Read eligible sessions, mappings and problems; save initial boundary.
 
 ```sh
-docker compose run --rm connector preview
+docker compose -f compose.build.yaml run --rm connector preview
 ```
 
 ## `exercises`
@@ -41,7 +41,7 @@ docker compose run --rm connector preview
 Print supported Strava identifiers without opening state.
 
 ```sh
-docker compose run --rm connector exercises
+docker compose -f compose.build.yaml run --rm connector exercises
 ```
 
 ## `map`
@@ -54,7 +54,7 @@ Override automatic matching for a SparkyFitness exercise UUID. Use an ID from pr
 | `strava_type` | supported identifier |
 
 ```sh
-docker compose run --rm connector map 00000000-0000-0000-0000-000000000001 BARBELL_BENCH_PRESS
+docker compose -f compose.build.yaml run --rm connector map 00000000-0000-0000-0000-000000000001 BARBELL_BENCH_PRESS
 ```
 
 ## `mappings`
@@ -62,7 +62,7 @@ docker compose run --rm connector map 00000000-0000-0000-0000-000000000001 BARBE
 Print saved manual overrides. Automatic choices appear in preview, not this list.
 
 ```sh
-docker compose run --rm connector mappings
+docker compose -f compose.build.yaml run --rm connector mappings
 ```
 
 ## `sync`
@@ -70,7 +70,7 @@ docker compose run --rm connector mappings
 Poll pending jobs, then submit ready sessions up to the cycle limit.
 
 ```sh
-docker compose run --rm connector sync
+docker compose -f compose.build.yaml run --rm connector sync
 ```
 
 ## `watch`
@@ -78,7 +78,7 @@ docker compose run --rm connector sync
 Run sync repeatedly using SYNC_INTERVAL_SECONDS.
 
 ```sh
-docker compose run --rm connector watch
+docker compose -f compose.build.yaml run --rm connector watch
 ```
 
 ## `status`
@@ -86,7 +86,7 @@ docker compose run --rm connector watch
 Print authorization, athlete, source, exports and cooldown.
 
 ```sh
-docker compose run --rm connector status
+docker compose -f compose.build.yaml run --rm connector status
 ```
 
 ## `reconcile`
@@ -99,7 +99,7 @@ Verify the remote external ID and attach a known upload.
 | `upload_id` | integer |
 
 ```sh
-docker compose run --rm connector reconcile preset:00000000-0000-0000-0000-000000000001 1
+docker compose -f compose.build.yaml run --rm connector reconcile preset:00000000-0000-0000-0000-000000000001 1
 ```
 
 ## `reconcile-activity`
@@ -112,7 +112,7 @@ Verify the remote external ID and attach a known activity.
 | `activity_id` | integer |
 
 ```sh
-docker compose run --rm connector reconcile-activity preset:00000000-0000-0000-0000-000000000001 1
+docker compose -f compose.build.yaml run --rm connector reconcile-activity preset:00000000-0000-0000-0000-000000000001 1
 ```
 
 ## `retry`
@@ -125,7 +125,7 @@ After checking Strava, approve an unresolved failed or uncertain attempt for res
 | `--confirm-no-activity` | required flag |
 
 ```sh
-docker compose run --rm connector retry preset:00000000-0000-0000-0000-000000000001 --confirm-no-activity
+docker compose -f compose.build.yaml run --rm connector retry preset:00000000-0000-0000-0000-000000000001 --confirm-no-activity
 ```
 
 ## External APIs

@@ -49,4 +49,4 @@ examples/                      Existing-stack overlay and released media Compose
 design/                        Historical design and validation notes
 ```
 
-Inspect the plan with `docker compose run --rm connector preview` before running `sync`. See [usage](usage.md) for selection and recovery details.
+Inspect the plan with `docker compose -f compose.build.yaml run --rm connector preview` before running `sync`. See [usage](usage.md) for selection and recovery details.

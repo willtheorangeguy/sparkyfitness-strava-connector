@@ -2,20 +2,11 @@
 
 ## Requirements
 
-Released Linux amd64 and arm64 images run under Docker Desktop or Docker Engine with Compose v2. Source development requires Python 3.12 or later. The integration target is SparkyFitness v1.8.0 pinned in its addon harness.
+Docker Engine or Docker Desktop with Compose v2 supports the Linux amd64/arm64 deployments. Source development requires Python 3.12+. The tested source API is SparkyFitness `v1.8.0`. Use an API key with diary and plan read access.
 
 ## Install methods
 
-=== "Released container"
-
-    Download `docker-compose.yml` and `env.example` from [v0.2.0](https://github.com/willtheorangeguy/sparkyfitness-strava-connector/releases/tag/v0.2.0). Rename `env.example` to `.env` and supply credentials:
-
-    ```sh
-    docker compose pull
-    docker compose run --rm connector --help
-    ```
-
-=== "Source container"
+=== "Current source"
 
     ```sh
     git clone https://github.com/willtheorangeguy/sparkyfitness-strava-connector.git
@@ -25,7 +16,18 @@ Released Linux amd64 and arm64 images run under Docker Desktop or Docker Engine 
     docker compose -f compose.build.yaml run --rm connector --help
     ```
 
-    Keep using `-f compose.build.yaml` for local-build commands. The published-image deployment shares its project and volume; stop one before switching.
+    Configure your actual credentials before following [getting started](getting-started.md). Keep using `-f compose.build.yaml` for this source deployment.
+
+=== "Published release"
+
+    On 2026-10-22, [v0.1.0](https://github.com/willtheorangeguy/sparkyfitness-strava-connector/releases/tag/v0.1.0) was the latest published release. Download its `docker-compose.yml` and `env.example`, rename the environment file to `.env` and supply credentials:
+
+    ```sh
+    docker compose pull
+    docker compose run --rm connector --help
+    ```
+
+    Use that release's own matched files and behavior. The current source version `0.2.0` and its automatic-worker features were not yet a published release. Use the source tab for the behavior documented by this site.
 
 === "Python development"
 
@@ -37,16 +39,16 @@ Released Linux amd64 and arm64 images run under Docker Desktop or Docker Engine 
     sparkyfitness-strava --help
     ```
 
-    Export configuration variables yourself. The Python entry point does not load `.env`; set `DATA_DIR=./runtime` for writable host state. Windows timezone data is a declared dependency.
+    Export settings yourself: the CLI does not load `.env`. Set `DATA_DIR=./runtime` for writable host state instead of the default `/data`.
 
 ## Verify the installation
 
-`--help` prints the command list without contacting a source or destination. Follow [getting started](getting-started.md) to authorize and run `check` and `preview`.
+`--help` prints subcommands without opening state or contacting APIs. After authorization, run the `check` and `preview` steps in [getting started](getting-started.md).
 
 ## Upgrading
 
-Set the released `CONNECTOR_VERSION` without `v`, run `docker compose pull`, then `docker compose up -d`. Keep state and update any companion media image to match.
+For a source deployment, update the checkout and rebuild with `compose.build.yaml`, then recreate the service with that same file. For a published release, change `CONNECTOR_VERSION` to a version that exists, pull and recreate. Keep the state volume. Source and published standalone deployments share their project/volume, so stop one before switching.
 
 ## Uninstalling
 
-`docker compose down` removes containers and the project network while preserving named volumes. Retain the state and browser profile for recovery. Deleting the export journal can create duplicate activities after reinstalling.
+For the source deployment, `docker compose -f compose.build.yaml down` removes containers/network while preserving named volumes. Keep journal and browser-profile backups for recovery. Losing state can duplicate exports.

@@ -10,4 +10,4 @@ The implemented selector deliberately limits exports to native preset/plan worko
 - Exercise matching uses a finite catalog and explicit aliases. Unknown/ambiguous names require a manual supported mapping.
 - Existing activities do not automatically receive image jobs; live browser layout/session changes can require operator attention.
 
-Inspect real selection reasons with `docker compose run --rm connector preview`. Read [usage](usage.md) before choosing a larger settling window or historical boundary.
+Inspect real selection reasons with `docker compose -f compose.build.yaml run --rm connector preview`. Read [usage](usage.md) before choosing a larger settling window or historical boundary.

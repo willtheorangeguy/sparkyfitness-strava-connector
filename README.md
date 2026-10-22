@@ -26,23 +26,27 @@
 
 ## Installation
 
-Download `docker-compose.yml` and `env.example` from [v0.2.0](https://github.com/willtheorangeguy/sparkyfitness-strava-connector/releases/tag/v0.2.0). Rename `env.example` to `.env`; set your source API key, Strava application credentials and timezone.
+Current source version `0.2.0` was not yet published as a release on 2026-10-22. Build the checkout for the features documented here. See [installation](docs/installation.md) for the published version.
 
 ```sh
-docker compose pull
-docker compose run --rm connector auth-url
-docker compose run --rm -i connector auth-complete
+git clone https://github.com/willtheorangeguy/sparkyfitness-strava-connector.git
+cd sparkyfitness-strava-connector
+cp .env.example .env
+# Fill in the source API key/token, Strava app credentials and timezone.
+docker compose -f compose.build.yaml build
+docker compose -f compose.build.yaml run --rm connector auth-url
+docker compose -f compose.build.yaml run --rm -i connector auth-complete
 ```
 
-Open the consent link and paste the full callback URL into `auth-complete`. Targets SparkyFitness v1.8.0. See [getting started](docs/getting-started.md).
+Open the consent URL and paste the complete localhost callback into the prompt. Follow [getting started](docs/getting-started.md) for account setup.
 
 ## Usage
 
 ```sh
-docker compose run --rm connector check
-docker compose run --rm connector preview
-docker compose run --rm connector sync
-docker compose up -d
+docker compose -f compose.build.yaml run --rm connector check
+docker compose -f compose.build.yaml run --rm connector preview
+docker compose -f compose.build.yaml run --rm connector sync
+docker compose -f compose.build.yaml up -d
 ```
 
 Inspect selection reasons and mappings before uploading. Partial workouts export once; later completed sets report `changed`. Stop the watcher for stateful maintenance and retain its volume.
@@ -62,7 +66,7 @@ Based on [wger-strava-connector](https://github.com/willtheorangeguy/wger-strava
 
 ## Support
 
-Open a [GitHub Discussion](https://github.com/willtheorangeguy/sparkyfitness-strava-connector/discussions/new) or file an [issue](https://github.com/willtheorangeguy/sparkyfitness-strava-connector/issues/new/choose).
+Open an [issue](https://github.com/willtheorangeguy/sparkyfitness-strava-connector/issues/new/choose).
 
 ## Contributing
 

@@ -2,93 +2,75 @@
 
 ## Prerequisites
 
-Use Docker with Compose v2, a SparkyFitness v1.8.0 instance and an API key with diary and plan read access. Register your own Strava application with callback domain `localhost`. Check Docker with `docker compose version`.
+Use Docker with Compose v2, a reachable SparkyFitness v1.8.0 API and an API key with diary/plan read access. Register your own Strava application with callback domain `localhost`. Check Docker with `docker compose version`.
 
 ## Install
 
-The connector is an always-running companion service to SparkyFitness. After
-one-time authorization, run
-`docker compose up -d` to start `watch`. Keep it running
-alongside SparkyFitness; daily manual sync
-commands are unnecessary. The existing-stack overlay runs the same watcher on the
-main service's network; standalone deployment reaches SparkyFitness by URL.
-
-The watcher checks immediately, then every `SYNC_INTERVAL_SECONDS` (900 seconds).
-It automatically uploads newly eligible preset/plan workouts after the five-minute
-settling period, then polls Strava until processing finishes. Defaults normally
-mean 5–20 minutes after the last completion/recorded end. Your completed-set-only
-selection remains in effect for native workouts: unfinished sets are omitted, and later completed sets
-do not update an activity already exported.
-
-Temporary main-service/Strava API failures are retried on later cycles.
-`restart: unless-stopped` restarts a failed container or resumes it after a Docker
-restart. Keep state; missing mappings hold workouts, and uncertain uploads need
-reconciliation. Neither condition silently creates a duplicate activity.
-
-Requires Docker Desktop/Linux containers and Compose. Download `docker-compose.yml`
-and `env.example` from the release into an empty directory. Rename `env.example`
-to `.env`, fill in the settings below, then run `docker compose pull`. No source
-checkout, Python installation, or local build is needed.
-
-Configure `.env`:
-
-- `SPARKYFITNESS_BASE_URL`: origin reachable from the container, without `/api`.
-  Default `http://host.docker.internal:8102` reaches the local harness.
-- `SPARKYFITNESS_API_KEY`: key with diary and plan read access; the harness uses
-  a full-scope key.
-- `STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET`: your own application from
-  [Strava API settings](https://www.strava.com/settings/api), callback domain `localhost`.
-- `WORKOUT_TIMEZONE`: IANA timezone, for example `America/Edmonton`.
-- `EXPORT_SINCE`: inclusive diary-date boundary (`YYYY-MM-DD`). Blank persists
-  today's UTC date on first preview/sync. Set explicitly for historical backfill.
+This guide covers the current source version `0.2.0`. On 2026-10-22, the latest published release was `v0.1.0`; a `v0.2.0` release download was not available. Build the checkout to use the current automatic image worker and recovery behavior.
 
 ```sh
-docker compose run --rm connector auth-url
-docker compose run --rm -i connector auth-complete
+git clone https://github.com/willtheorangeguy/sparkyfitness-strava-connector.git
+cd sparkyfitness-strava-connector
+cp .env.example .env
 ```
 
-Open the link and grant `read`, `activity:write`, and `activity:read_all`. The localhost
-redirect gives an expected connection error; no callback server is needed. Paste
-the complete callback URL into `auth-complete`. Keep it private. Authorization
-validates the nonce, its 15-minute expiry, and scopes. Tokens persist and rotate.
+Fill in `SPARKYFITNESS_BASE_URL` (origin reachable from the container), `SPARKYFITNESS_API_KEY`, `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` and `WORKOUT_TIMEZONE`. The source API default is `http://host.docker.internal:8102`. Set `EXPORT_SINCE=2026-01-01` for historical backfill; an empty value saves today's UTC date on the first preview/sync as an inclusive diary-date boundary.
 
 ```sh
-docker compose run --rm connector check
-docker compose run --rm connector preview
-docker compose run --rm connector sync
-docker compose up -d
+docker compose -f compose.build.yaml build
+docker compose -f compose.build.yaml run --rm connector auth-url
 ```
 
-Exercises match automatically against the bundled 656-exercise Strava catalog
-using normalized names and common library aliases. Preview's `exercise_mappings`
-lists each chosen `strava_type` and its matching `method`: `catalog`, `alias`, or
-`manual`. Some aliases use a broader supported category where Strava lacks the
-exact variation (for example, Pec Static Stretch uses `STRETCH`). Garmin and other
-imports remain excluded before matching.
+## First run
 
-Manual overrides are optional and take priority over automatic matches:
+1. Open the printed Strava consent URL. Grant `read`, `activity:write`, and `activity:read_all`.
+2. The browser redirects to a localhost callback and displays an expected connection error. Copy the full address from its address bar. No callback server or public connector port is required.
+3. Complete authorization within 15 minutes, using the same state volume:
 
-```sh
-docker compose run --rm connector exercises
-docker compose run --rm connector map EXERCISE_UUID BARBELL_BENCH_PRESS
-docker compose run --rm connector mappings
-```
+   ```sh
+   docker compose -f compose.build.yaml run --rm -i connector auth-complete
+   ```
 
-Replace `EXERCISE_UUID` with an ID from preview. `mappings` lists saved manual
-overrides; automatic matches are recalculated without writing overrides. Unknown
-or ambiguous names remain blocked rather than receiving a fuzzy guess. Preview
-lists their IDs in `missing`, names in `missing_exercises`, and a reason. Unmatched
-sets are omitted from the preview payload; the whole workout is held until resolved.
-Background sync defaults to 900 seconds, five-minute settling, and ten new uploads
-per cycle. Later cycles poll asynchronous jobs. One account/athlete per instance.
-Stop the background service before opening the same state with maintenance commands.
+   Paste the full callback URL at the prompt. It contains a temporary authorization code, so keep it private. Success returns `authorized_athlete` and stores rotating tokens in the journal.
+
+4. Check the bound accounts and inspect source selection:
+
+   ```sh
+   docker compose -f compose.build.yaml run --rm connector check
+   docker compose -f compose.build.yaml run --rm connector preview
+   ```
+
+   `check` returns source identity and athlete ID. `preview` reports session keys, state, missing mappings and problems without uploading activities.
+
+5. Inspect automatic catalog/alias matches. Add a manual UUID override only for missing or intentionally different matches.
+
+   ```sh
+   docker compose -f compose.build.yaml run --rm connector exercises
+   docker compose -f compose.build.yaml run --rm connector map 00000000-0000-0000-0000-000000000001 BARBELL_BENCH_PRESS
+   docker compose -f compose.build.yaml run --rm connector preview
+   ```
+
+   Replace the example ID with an actual source exercise ID from preview. Unmapped/invalid completed sets hold the whole workout.
+
+6. Export once, then start continuous synchronization:
+
+   ```sh
+   docker compose -f compose.build.yaml run --rm connector sync
+   docker compose -f compose.build.yaml up -d
+   docker compose -f compose.build.yaml logs -f connector
+   ```
+
+   A successful submission commonly reports `processing` until a later sync polls the activity ID. The watcher checks immediately, then every 900 seconds by default, with a 300-second settling delay and at most ten new uploads per cycle. Unfinished/future data remains excluded. Temporary API failures are logged for a later cycle; uncertain writes stay held for explicit recovery.
 
 ## What just happened
 
-The connector bound the API key owner and Strava athlete to a persistent journal. It selected native preset/plan workouts and exported eligible completed sets. Preview records its initial date boundary but does not upload activities.
+The connector bound one SparkyFitness account, Strava application and athlete to a persistent journal. It exported completed sets in eligible native preset/plan workouts without modifying SparkyFitness. Partial workouts export once: later completed sets report changed rather than appending to an existing activity.
+
+Stop the watcher before stateful one-off maintenance and restart it afterwards. Keep state: it contains tokens, account bindings, mappings, boundary and upload history. Deleting it can duplicate exports. Never reuse wger state.
 
 ## Next steps
 
-- Read [selection and recovery](usage.md) before exporting partial workouts.
-- Use [configuration](configuration.md) for defaults and the existing-stack variable names.
-- Add [workout images](media.md) after core exports work.
+- [Installation](installation.md) explains released versions and local builds.
+- [Usage](usage.md) covers selection, data fidelity and recovery.
+- [Configuration](configuration.md) lists defaults and overlay variables.
+- [Workout images](media.md) explains the companion browser login and durable receipts.

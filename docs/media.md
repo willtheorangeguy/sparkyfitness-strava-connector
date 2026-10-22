@@ -2,13 +2,13 @@
 
 Set `MEDIA_ENABLED=true` and `MEDIA_UNITS=lb` (or `kg`) in `.env`, then recreate the core connector. Each new successful export creates an immutable image job. The activity description also includes total external weight times repetitions; timed holds and unrecorded body weight add no volume.
 
-Download `docker-compose.media.yml` from the same release beside your standalone `.env`, then sign into the same Strava account once:
+Build the local media image from this checkout, then sign into the same athlete once:
 
 ```sh
-docker compose -f docker-compose.media.yml pull
-docker compose -f docker-compose.media.yml run --rm --service-ports media-login
-docker compose -f docker-compose.media.yml up -d media-worker
-docker compose -f docker-compose.media.yml run --rm --no-deps media-worker status
+docker compose -f compose.media.yaml build
+docker compose -f compose.media.yaml run --rm --service-ports media-login
+docker compose -f compose.media.yaml up -d media-worker
+docker compose -f compose.media.yaml run --rm --no-deps media-worker status
 ```
 
 The standalone core connector must already have created its state volume. For an existing source stack, set `STRAVA_MEDIA_ENABLED=true` and `STRAVA_MEDIA_UNITS=lb` in that stack's environment, and set `CONNECTOR_STATE_VOLUME` beside the media Compose file to the actual `<stack>_strava_connector_state` volume name. For source-checkout builds, use `compose.media.yaml` in the commands above and build `media-worker` first.
@@ -17,19 +17,19 @@ Stop `media-worker` before interactive login, and start it again afterwards. Bro
 
 Jobs and receipts persist under `/data/media`. An interrupted file selection or Save is held as `uncertain`; inspect the activity and receipt before any manual recovery. Never delete a receipt simply to retry an upload. Browser login expiry leaves new jobs pending; log in again to resume. Existing activity photos are held for review. API workout exports continue independently of browser failures.
 
-Automatic images are included in v0.2.0. Older releases provide only preview/login tools. The mock-only attachment helper retains its origin restriction.
+Automatic images are implemented in source version 0.2.0. At the 2026-10-22 documentation check, that version was not yet a published release. The mock-only attachment helper retains its origin restriction.
 
 Muscle highlighting uses explicit source metadata: SparkyFitness's completed-exercise snapshots. Source names and Latin anatomy names are translated into the diagram's regions. Primary takes precedence when an area is also secondary in another exercise. Uncompleted SparkyFitness exercises are excluded. Unknown names remain unhighlighted and are recorded under `unmapped_muscles` in the image job. Previously attached image files are not rewritten automatically.
 
 ## Card previews and browser login
 
 ```sh
+docker compose -f compose.media.yaml build
 docker compose -f compose.media.yaml run --rm preview
 docker compose -f compose.media.yaml run --rm --service-ports media-login
 ```
 
-The commands above build media tools from a checkout. For the published image, use
-the release's `docker-compose.media.yml` instead of `compose.media.yaml`.
+The commands above use media tools built from this checkout. Use matched release files only for versions that have actually been published.
 Preview writes synthetic SparkyFitness cards and 30 illustrated comparisons to
 `design/previews/`. Login opens `http://localhost:6080/vnc.html`; enter the printed
 viewer password and sign into Strava yourself, including MFA. Stop with Ctrl+C to
@@ -51,9 +51,9 @@ Use the host and user for your server. Open the viewer at `http://localhost:6080
 
 | Command | Example | Result |
 | --- | --- | --- |
-| `status` | `docker compose -f docker-compose.media.yml run --rm --no-deps media-worker status` | Activity ID and persisted receipt state, or pending. |
-| `once` | `docker compose -f docker-compose.media.yml run --rm media-worker once` | Process eligible jobs once. Stop the resident worker first. |
-| `watch` | `docker compose -f docker-compose.media.yml up -d media-worker` | Poll every 60 seconds using the service default. |
+| `status` | `docker compose -f compose.media.yaml run --rm --no-deps media-worker status` | Activity ID and persisted receipt state, or pending. |
+| `once` | `docker compose -f compose.media.yaml run --rm media-worker once` | Process eligible jobs once. Stop the resident worker first. |
+| `watch` | `docker compose -f compose.media.yaml up -d media-worker` | Poll every 60 seconds using the service default. |
 
 The Python worker also accepts `--data` (default `/data`) and `--profile` (default `/browser-profile`). The renderer accepts `--output`, default `/previews`.
 

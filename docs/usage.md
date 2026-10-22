@@ -42,10 +42,10 @@ supersets, and rest targets are not uploaded as structured metrics.
 Stop the watcher before maintenance:
 
 ```sh
-docker compose stop connector
-docker compose run --rm connector preview
-docker compose run --rm connector mappings
-docker compose up -d
+docker compose -f compose.build.yaml stop connector
+docker compose -f compose.build.yaml run --rm connector preview
+docker compose -f compose.build.yaml run --rm connector mappings
+docker compose -f compose.build.yaml up -d
 ```
 
 `exercise_mappings` reports `catalog`, `alias`, or `manual` for each selected match. Manual UUID overrides take priority. Automatic matches are recalculated without saving overrides. Unknown or ambiguous names remain in `missing` and `missing_exercises`, blocking the whole workout. Provider imports are excluded before matching.
