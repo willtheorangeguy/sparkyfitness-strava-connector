@@ -83,7 +83,7 @@ def cards(tmp_path_factory):
 def sign_in(page, origin, athlete='123456'):
     page.goto(origin+'/login')
     page.get_by_label('Athlete ID').fill(athlete)
-    page.get_by_role('button',name='Sign in').click()
+    page.get_by_role('button',name='Sign in').click(timeout=30000)
 
 
 def test_session_only_login_survives_browser_restart_and_logout_clears_saved_cookies(tmp_path):

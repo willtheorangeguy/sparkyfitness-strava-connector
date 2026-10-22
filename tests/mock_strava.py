@@ -11,7 +11,7 @@ STATE = {}
 
 def reset():
     STATE.clear()
-    STATE.update({"uploads": {}, "requests": [], "refreshes": 0, "refresh_token": "mock-refresh-0"})
+    STATE.update({"uploads": {}, "requests": [], "refreshes": 0, "refresh_token": "mock-refresh-0", "fail_next_upload": False})
 
 
 reset()
@@ -50,7 +50,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply({}, 404)
             upload["polls"] += 1
             return self.reply({"id": upload["id"], "id_str": str(upload["id"]), "external_id": upload["external_id"],
-                               "error": None, "activity_id": 900000 + upload["id"], "status": "Your activity is ready."})
+                               "error": upload.get("error"), "activity_id": None if upload.get("error") else 900000 + upload["id"],
+                               "status": "There was an error processing your activity." if upload.get("error") else "Your activity is ready."})
         self.reply({}, 404)
 
     def do_POST(self):
@@ -58,6 +59,9 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/__reset":
             reset()
             return self.reply({"reset": True})
+        if self.path == "/__fail_next_upload":
+            STATE["fail_next_upload"] = True
+            return self.reply({"fail_next_upload": True})
         if self.path == "/oauth/token":
             values = {k: v[0] for k, v in parse_qs(raw.decode()).items()}
             if values.get("client_id") != "mock-client" or values.get("client_secret") != "mock-secret":
@@ -84,13 +88,21 @@ class Handler(BaseHTTPRequestHandler):
         payload = json.loads(fields["file"])
         assert fields["sport_type"] == "WeightTraining" and fields["data_type"] == "json"
         assert payload["version"] == "1.0" and payload["sets"] and payload["elapsed_time"] > 0
+        assert payload["start_time"].endswith("Z"), "Live Strava rejects activity timestamps using +00:00"
         assert all("exercise_type" in s and ("repetitions" in s or "duration" in s) for s in payload["sets"])
         for upload in STATE["uploads"].values():
             if upload["external_id"] == fields["external_id"]:
+                if upload.get("error"):
+                    # Live Strava returns the cached failed job for the same
+                    # file ID instead of attempting to process changed bytes.
+                    return self.reply({"id": upload["id"], "id_str": str(upload["id"]),
+                        "external_id": upload["external_id"], "error": upload["error"], "activity_id": None}, 201)
                 return self.reply({"error": "Duplicate upload"}, 400)
         identity = len(STATE["uploads"]) + 1
         STATE["uploads"][str(identity)] = {"id": identity, "external_id": fields["external_id"], "payload": payload,
-                                           "polls": 0, "name": fields["name"], "description": fields["description"]}
+                                           "polls": 0, "name": fields["name"], "description": fields["description"],
+                                           "error": "Error Processing Data" if STATE["fail_next_upload"] else None}
+        STATE["fail_next_upload"] = False
         STATE["requests"].append({"method": "POST", "path": self.path})
         return self.reply({"id": identity, "id_str": str(identity), "external_id": fields["external_id"],
                            "error": None, "activity_id": None, "status": "Your activity is still being processed."}, 201)

@@ -58,3 +58,9 @@ def test_release_downloads_target_actual_image_and_version(tmp_path, version):
     assert 'CONNECTOR_VERSION:-'+version+'}-media' in (tmp_path/'docker-compose.media.yml').read_text()
     assert "CONNECTOR_VERSION=" + version + "\n" in (tmp_path / "env.example").read_text()
     assert "STRAVA_CONNECTOR_VERSION=" + version + "\n" in (tmp_path / "sparkyfitness.env.example").read_text()
+
+    media = (tmp_path / 'docker-compose.media.yml').read_text()
+    assert '  media-worker:' in media and 'command: [watch]' in media
+    assert 'restart: unless-stopped' in media
+    assert 'connector_state:/data' in media and 'CONNECTOR_STATE_VOLUME:-' in media
+    assert 'external: true' in media

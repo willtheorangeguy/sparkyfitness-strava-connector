@@ -1,7 +1,7 @@
 name: sparkyfitness-strava-connector
 services:
   connector:
-    image: ${CONNECTOR_IMAGE:-ghcr.io/willtheorangeguy/sparkyfitness-strava-connector}:${CONNECTOR_VERSION:-0.1.0}
+    image: ${CONNECTOR_IMAGE:-ghcr.io/willtheorangeguy/sparkyfitness-strava-connector}:${CONNECTOR_VERSION:-0.2.0}
     env_file: .env
     # Run continuously beside the main service and export new eligible workouts.
     command: [watch]

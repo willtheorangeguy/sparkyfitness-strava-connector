@@ -52,7 +52,9 @@ def seed(base, email, password, journal):
         for logged in child["sets"]: logged["completed_at"] = None
     api.request("/api/exercise-preset-entries", {"workout_preset_id": preset["id"], "entry_date": day, "exercises": pending})
     missing = deepcopy(children)
-    for child in missing: child["entry_time"] = None
+    for child in missing:
+        child["entry_time"] = None
+        child["duration_minutes"] = 0
     api.request("/api/exercise-preset-entries", {"workout_preset_id": preset["id"], "entry_date": day, "exercises": missing})
     future_day = str(date.today() + timedelta(days=2))
     future = deepcopy(children)

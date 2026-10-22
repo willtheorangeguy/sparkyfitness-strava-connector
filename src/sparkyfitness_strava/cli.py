@@ -29,10 +29,10 @@ def main():
     commands.add_parser("auth-url", help="Print a Strava consent link")
     commands.add_parser("auth-complete", help="Read the complete browser callback URL from stdin")
     commands.add_parser("exercises", help="List supported Strava exercise identifiers")
-    mapping = commands.add_parser("map", help="Approve a sparkyfitness exercise ID -> Strava identifier mapping")
+    mapping = commands.add_parser("map", help="Override automatic matching for a SparkyFitness exercise ID")
     mapping.add_argument("exercise")
     mapping.add_argument("strava_type", choices=sorted(EXERCISES))
-    commands.add_parser("mappings")
+    commands.add_parser("mappings", help="List saved manual overrides; preview includes automatic matches")
     commands.add_parser("preview")
     commands.add_parser("check")
     commands.add_parser("sync")
@@ -88,12 +88,8 @@ def main():
             result = {"authorized": bool(state.get("oauth")), "athlete": state.get("strava_athlete"),
                       "sparkyfitness": state.get("sparkyfitness_account"), "exports": state.exports(), "cooldown": state.get("cooldown")}
         elif args.command == "retry":
-            record = state.export(args.session)
-            if not record or record["state"] not in {"uncertain", "failed"}:
-                raise ValueError("Only uncertain or failed uploads can be retried")
-            state.db.execute("DELETE FROM exports WHERE session=?", (args.session,))
-            state.db.commit()
-            result = {"retry_allowed": args.session}
+            engine = Engine(config, state)
+            result = engine.retry(args.session)
         else:
             engine = Engine(config, state)
             if args.command == "watch":

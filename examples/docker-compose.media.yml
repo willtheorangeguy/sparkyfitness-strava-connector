@@ -1,7 +1,7 @@
-# Experimental rendering/login tools. Automatic workout image attachment is pending.
+# Automatic workout cards, offline previews and interactive browser login.
 name: sparkyfitness-strava-media
 x-media: &media
-  image: ${CONNECTOR_IMAGE:-ghcr.io/willtheorangeguy/sparkyfitness-strava-connector}:${CONNECTOR_VERSION:-0.1.0}-media
+  image: ${CONNECTOR_IMAGE:-ghcr.io/willtheorangeguy/sparkyfitness-strava-connector}:${CONNECTOR_VERSION:-0.2.0}-media
   init: true
   shm_size: 1gb
 services:
@@ -11,6 +11,15 @@ services:
     entrypoint: [python, -m, sparkyfitness_strava.media.render]
     command: [--output, /previews]
     volumes: ['./previews:/previews']
+  media-worker:
+    <<: *media
+    entrypoint: [python, -m, sparkyfitness_strava.media.worker]
+    command: [watch]
+    restart: unless-stopped
+    stop_grace_period: 30s
+    volumes:
+      - browser_profile:/browser-profile
+      - connector_state:/data
   media-login:
     <<: *media
     command: [login]
@@ -22,3 +31,6 @@ services:
       - ./previews:/previews:ro
 volumes:
   browser_profile:
+  connector_state:
+    external: true
+    name: ${CONNECTOR_STATE_VOLUME:-sparkyfitness-strava-connector_state}

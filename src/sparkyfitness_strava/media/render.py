@@ -48,15 +48,18 @@ def html(summary, theme, kind):
     e = lambda key: escape(str(summary[key]))
     header = '''<div class="top"><div class="brand"><svg class="brand-mark" viewBox="0 0 40 30"><path d="M3 9v12M9 4v22M15 15h10M31 4v22M37 9v12" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>SparkyFitness<span>workout stories</span></div><div class="tag">STRENGTH / 01</div></div>'''
     if kind == 'summary':
+        focus = ' · '.join(str(m).replace('_', ' ').title() for m in summary['primary'])
+        if not focus and summary['secondary']:
+            focus = 'Secondary: ' + ' · '.join(str(m).replace('_', ' ').title() for m in summary['secondary'])
         volume_size = min(49, 310 / max(6, len(str(summary['volume']))))
         figures = ''.join('<div class="figure">'+body(summary['primary'], summary['secondary'], back)+'<div class="figure-label">'+label+'</div></div>' for back, label in [(False,'FRONT'),(True,'BACK')])
-        content = f'''<div class="kicker">{e('date')} · WORKOUT COMPLETE</div><h1>{e('title')}. Full effort.</h1>
+        content = f'''<div class="kicker">{e('date')} · WORKOUT COMPLETE</div><h1 style="font-size:{min(76, 1400 / max(20, len(str(summary['title']))))}px">{e('title')}</h1>
         <div class="summary-main"><div>
           <div class="metric"><div class="label">Total volume</div><div class="value" style="font-size:{volume_size}px">{e('volume')}<span class="unit" style="font-size:{min(22, volume_size * .45)}px">{e('units')}</span></div></div>
           <div class="metric"><div class="label">Time well spent</div><div class="value">{e('duration')}</div></div>
           <div class="metric pair"><div><div class="label">Exercises</div><div class="value">{e('exercise_count')}</div></div><div><div class="label">Sets</div><div class="value">{e('set_count')}</div></div></div>
         </div><div class="anatomy"><div class="diagram-title">MUSCLES WORKED</div><div class="bodies">{figures}</div><div class="legend"><span><i class="dot"></i>Primary</span><span><i class="dot secondary"></i>Secondary</span><span>Not intensity</span></div></div></div>
-        <div class="muscle-list"><strong>THE FOCUS</strong> &nbsp; {escape(' · '.join(str(m).replace('_',' ').title() for m in summary['primary']))} <span style="margin-left:auto;font-size:11px">Schematic anatomy</span></div>'''
+        <div class="muscle-list"><strong>THE FOCUS</strong> &nbsp; {escape(focus or 'Muscle metadata unavailable')} <span style="margin-left:auto;font-size:11px">Schematic anatomy</span></div>'''
     else:
         display_mass = summary['volume_kg'] * (POUNDS_PER_KG if summary['units'] == 'lb' else 1)
         comparison = compare(display_mass, summary['units'])

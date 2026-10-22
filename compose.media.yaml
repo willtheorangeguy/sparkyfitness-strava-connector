@@ -1,4 +1,4 @@
-# Experimental milestone only. Production sync is not connected to this service.
+# Optional automatic image worker and interactive browser login.
 name: sparkyfitness-strava-media-preview
 x-media: &media
   build:
@@ -18,6 +18,16 @@ services:
     user: '0:0'
     entrypoint: [python, -m, sparkyfitness_strava.media.render]
     command: [--output, /previews]
+  media-worker:
+    <<: *media
+    entrypoint: [python, -m, sparkyfitness_strava.media.worker]
+    command: [watch]
+    restart: unless-stopped
+    stop_grace_period: 30s
+    volumes:
+      - ./src:/app/src:ro
+      - browser_profile:/browser-profile
+      - connector_state:/data
   media-login:
     <<: *media
     command: [login]
@@ -26,3 +36,6 @@ services:
     ports: ['127.0.0.1:6080:6080']
 volumes:
   browser_profile:
+  connector_state:
+    external: true
+    name: sparkyfitness-strava-connector_state

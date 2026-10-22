@@ -2,6 +2,14 @@
 from .state import encode
 
 
+def is_native_workout(session):
+    # "manual"/"Manual" are the API defaults for native entries; the app also uses
+    # "sparky". Check children too so imported sets cannot enter a native group.
+    sources = {str(entry["source"]).strip().lower() for entry in [session, *session.get("exercises", [])]
+               if entry.get("source")}
+    return bool(sources) and sources <= {"sparky", "manual"}
+
+
 def select_workouts(sessions, plans):
     assignments = {}
     for plan in plans:
@@ -9,6 +17,8 @@ def select_workouts(sessions, plans):
             assignments[str(assignment["id"])] = (plan, assignment)
     groups = {}
     for session in sessions:
+        if not is_native_workout(session):
+            continue
         if session["type"] == "preset":
             children = session.get("exercises", [])
             if session.get("workout_preset_id") is None and session.get("workout_plan_assignment_id") is None and not any(

@@ -3,8 +3,12 @@ import hashlib
 import time
 from .api import APIError, UnknownWrite, SparkyFitness, Strava
 from .state import encode
+from .media.queue import enqueue, snapshot
+from .media.summary import formatted_volume
+from .media.muscles import sparky_session
 from .workout import build, fingerprint, stamp, SkipWorkout
 from .source import select_workouts
+from .mapping import resolve_exercise
 
 
 class Engine:
@@ -49,10 +53,20 @@ class Engine:
             try:
                 payload, missing, problems = build(session, mappings, self.config.timezone)
                 end = stamp(payload["start_time"]) + timedelta(seconds=payload["elapsed_time"])
+                # A reported total may exclude pauses. Still wait after the
+                # latest completion before uploading the workout.
+                completions = [stamp(item["completed_at"]) for entry in session.get("exercises", [])
+                               for item in entry.get("sets", []) if item.get("completed_at") is not None]
+                end = max([end, *completions])
                 if end > cutoff:
                     continue
                 state = "blocked" if missing or problems else "ready"
-                reason = None
+                reasons = []
+                if missing:
+                    reasons.append(f"Missing Strava exercise mappings for {len(missing)} exercise(s)")
+                if problems:
+                    reasons.append(f"Invalid logged data in {len(problems)} set(s); see problems")
+                reason = "; ".join(reasons) or None
             except SkipWorkout as error:
                 payload, missing, problems = {}, [], []
                 state, reason = "skipped", str(error)
@@ -70,17 +84,39 @@ class Engine:
                     regrouped = True
                     # Moving a plan session or regrouping its entries is a source edit,
                     # never a new export intent. Keep unresolved jobs held as well.
-                    state = "changed" if previous["state"] == "exported" else previous["state"]
-            if previous:
+                    if previous["state"] != "retry":
+                        state = "changed" if previous["state"] == "exported" else previous["state"]
+            if previous and previous["state"] != "retry":
                 state = previous["state"]
                 if state == "exported" and (regrouped or previous["fingerprint"] != current):
                     state = "changed"
             account = hashlib.sha256(encode(identity).encode()).hexdigest()[:16]
             external = hashlib.sha256(key.encode()).hexdigest()[:32]
+            external_id = f"sparkyfitness-{account}-{external}"
+            if previous and previous["state"] == "retry":
+                external_id += f".retry{previous['attempt']}"
+            external_id += ".json"
+            if previous and previous["state"] != "retry":
+                external_id = previous["external_id"]
+            names = {str(entry.get("exercise_id")): (entry.get("exercise_snapshot") or {}).get("name")
+                     or entry.get("name") or "Unnamed exercise" for entry in session.get("exercises", [])}
+            resolved = {}
+            for entry in session.get("exercises", []):
+                if not any(item.get("completed_at") is not None for item in entry.get("sets", [])):
+                    continue
+                target, method = resolve_exercise(entry, mappings)
+                exercise = str(entry.get("exercise_id") or "")
+                if target is not None:
+                    resolved[exercise] = {"id": exercise, "name": names.get(exercise),
+                                          "strava_type": target, "method": method}
             output.append({"session": key, "state": state, "missing": missing, "problems": problems,
+                           "exercise_mappings": list(resolved.values()),
+                           "muscles": sparky_session(session),
+                           "missing_exercises": [{"id": exercise, "name": names.get(exercise, "Unnamed exercise")}
+                                                 for exercise in missing],
                            "source_entries": source_entries,
                            "reason": reason, "fingerprint": current,
-                           "external_id": f"sparkyfitness-{account}-{external}.json", **content})
+                           "external_id": external_id, **content})
         return output
 
     def check(self):
@@ -102,6 +138,15 @@ class Engine:
         else:
             record["state"] = "processing"
         self.state.save(session, record)
+        self.queue_media(session, record)
+
+    def queue_media(self, session, record):
+        try:
+            enqueue(self.config, self.state, record)
+            record.pop("media_error", None)
+        except (OSError, ValueError):
+            record["media_error"] = "Image queue unavailable; workout remains exported"
+        self.state.save(session, record)
 
     def sync(self):
         if self.state.get("cooldown", 0) > time.time():
@@ -112,19 +157,27 @@ class Engine:
             if record["state"] == "processing":
                 upload = self.strava.call("GET", "/uploads/" + record["upload_id"])
                 self.finish(session, record, upload)
+        for session, record in self.state.exports().items():
+            if record["state"] == "exported" and record.get("media"):
+                self.queue_media(session, record)
         plans = self.preview()
         submitted = 0
         for plan in plans:
             if plan["state"] != "ready" or submitted >= self.config.batch:
                 continue
             record = {key: plan[key] for key in ("fingerprint", "external_id", "source_entries")}
+            previous = self.state.export(plan["session"])
+            if previous:
+                record.update({key: previous[key] for key in ("attempt", "attempts") if key in previous})
+            if self.config.media_enabled:
+                record["media"] = snapshot(plan, self.config)
             record["state"] = "uncertain"
             # Commit intent before the POST: a crash or lost reply must not cause another upload.
             self.state.save(plan["session"], record)
             try:
                 upload = self.strava.call("POST", "/uploads", data={
                     "data_type": "json", "sport_type": "WeightTraining", "trainer": "1",
-                    "name": plan["name"], "description": ("Exported from SparkyFitness.\n" + plan["notes"])[:10000],
+                    "name": plan["name"], "description": ("Exported from SparkyFitness.\n" + plan["notes"] + "\nTotal weight lifted: " + formatted_volume(plan["payload"]["sets"], self.config.media_units) + " " + self.config.media_units + " (external load x repetitions).")[:10000],
                     "external_id": plan["external_id"]},
                     files={"file": (plan["external_id"], encode(plan["payload"]).encode(), "application/json")})
                 if not isinstance(upload, dict) or not (upload.get("id_str") or upload.get("id")):
@@ -153,6 +206,28 @@ class Engine:
                 "changed": [p["session"] for p in plans if p["state"] == "changed"],
                 "skipped": [{"session": p["session"], "reason": p["reason"]} for p in plans if p["state"] == "skipped"]}
 
+    def retry(self, session):
+        record = self.state.export(session)
+        if not record or record["state"] not in {"uncertain", "failed"}:
+            raise ValueError("Only uncertain or failed uploads can be retried")
+        self.check()
+        if record.get("upload_id"):
+            upload = self.strava.call("GET", "/uploads/" + record["upload_id"])
+            if str(upload.get("external_id")) != record["external_id"]:
+                raise ValueError("Strava upload external ID does not match this session")
+            if upload.get("activity_id") or not upload.get("error"):
+                raise ValueError("Prior upload is successful or processing; reconcile it instead of retrying")
+        # Strava caches failed uploads by external ID. Keep the workout identity
+        # and journal history, but give the explicitly requested attempt a fresh
+        # file identifier. Source edits must never implicitly request a retry.
+        attempts = record.get("attempts", []) + [{key: record[key] for key in
+                    ("external_id", "upload_id", "state", "reason") if key in record}]
+        record["attempt"] = record.get("attempt", len(record.get("attempts", []))) + 1
+        record["attempts"] = attempts
+        record["state"] = "retry"
+        self.state.save(session, record)
+        return {"retry_allowed": session, "attempt": record["attempt"]}
+
     def reconcile(self, session, upload_id):
         self.check()
         record = self.state.export(session)
@@ -175,4 +250,5 @@ class Engine:
             raise ValueError("Activity does not belong to this sparkyfitness session")
         record.update(state="exported", activity_id=str(activity["id"]))
         self.state.save(session, record)
+        self.queue_media(session, record)
         return record

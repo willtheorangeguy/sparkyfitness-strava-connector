@@ -24,7 +24,7 @@ class Source:
         return {"authenticatedUserId": "watch-test", "activeUserId": "watch-test"}
 
     def sessions(self):
-        return [{"type": "preset", "id": "session", "workout_preset_id": 1,
+        return [{"type": "preset", "source": "sparky", "id": "session", "workout_preset_id": 1,
                  "entry_date": self.day, "name": "Watch test", "exercises": [{
                      "id": "entry", "exercise_id": self.exercise_id, "entry_date": self.day,
                      "entry_time": "10:00", "duration_minutes": 60,

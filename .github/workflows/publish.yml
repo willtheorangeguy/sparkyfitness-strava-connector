@@ -57,7 +57,7 @@ jobs:
           - variant: media
             file: Dockerfile.media
             suffix: '-media'
-            title: Experimental workout cards and browser login tools
+            title: Automatic workout cards and browser login
     permissions:
       contents: read
       packages: write

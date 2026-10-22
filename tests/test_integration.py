@@ -36,6 +36,7 @@ def remote(config):
 
 def test_completed_sessions_upload_native_exercises_and_survive_restart(live):
     config, state, engine, fixture = live
+    config.media_enabled = True
     preview = engine.preview()
     assert len([p for p in preview if p["state"] == "ready"]) == 2
     assert len([p for p in preview if p["state"] == "skipped"]) == 2
@@ -50,10 +51,13 @@ def test_completed_sessions_upload_native_exercises_and_survive_restart(live):
         assert again.sync()["submitted"] == 0
         assert {x["state"] for x in restarted.exports().values()} == {"exported"}
         assert again.sync()["submitted"] == 0
+        jobs = list((config.data_dir / "media" / "outbox").glob("*.json"))
+        assert len(jobs) == len(restarted.exports())
+        assert all(json.loads(p.read_text())["payload"]["sets"] for p in jobs)
         records = remote(config)
         assert len(records["uploads"]) == len(records["requests"]) == 2
         first = records["uploads"]["1"]["payload"]
-        assert first["elapsed_time"] == 2700 and first["utc_offset"] == 0
+        assert first["elapsed_time"] == 3300 and first["utc_offset"] == 0
         assert [s["exercise_type"] for s in first["sets"]] == ["BARBELL_BENCH_PRESS"] * 3 + ["PLANK_GENERIC"]
         assert first["sets"][0]["weight"] == pytest.approx(61.23)
         assert first["sets"][3]["duration"] == 90 and "weight" not in first["sets"][3]
@@ -127,6 +131,29 @@ def test_unmapped_workout_is_held_and_rotated_token_is_persisted(live):
     assert state.get("oauth")["refresh_token"] == "mock-refresh-2"
     state.set("mappings", mappings)
     assert engine.sync()["submitted"] == 2
+
+
+def test_failed_upload_retry_gets_fresh_job_and_preserves_history(live, monkeypatch):
+    config, state, engine, fixture = live
+    selected = [session for session in engine.sparkyfitness.sessions() if session["id"] == fixture["sessions"][0]]
+    assert len(selected) == 1
+    monkeypatch.setattr(engine.sparkyfitness, "sessions", lambda: iter(selected))
+    httpx.post(config.strava_url + "/__fail_next_upload", trust_env=False).raise_for_status()
+    assert engine.sync()["submitted"] == 1
+    assert engine.sync()["submitted"] == 0
+    key = "preset:" + fixture["sessions"][0]
+    original = state.export(key)
+    assert original["state"] == "failed"
+    assert engine.retry(key)["attempt"] == 1
+    assert engine.sync()["submitted"] == 1
+    assert engine.sync()["submitted"] == 0
+    exported = state.export(key)
+    assert exported["state"] == "exported"
+    assert exported["upload_id"] != original["upload_id"]
+    assert exported["external_id"] != original["external_id"]
+    assert exported["attempts"][0]["upload_id"] == original["upload_id"]
+    assert engine.sync()["submitted"] == 0
+    assert len(remote(config)["uploads"]) == 2
 
 
 def test_source_edits_are_reported_without_duplicate_or_update(live):

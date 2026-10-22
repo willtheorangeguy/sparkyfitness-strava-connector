@@ -1,3 +1,5 @@
+> Release v0.2.0: automatic export cards are implemented. See the main README's automatic cards section for worker setup, durable job status and recovery. Historical preview milestones below describe earlier published releases.
+
 # Experimental SparkyFitness cards
 
 Ported from wger-strava-connector v0.2.1: midnight blue, enlarged muscle diagrams,
@@ -14,8 +16,8 @@ sign in manually, then stop with Ctrl+C to preserve cookies. For remote hosts:
 
 `compose.media.test.yaml` uses real Chromium against a mock website to test
 rendering, persistent login, identity checks, attachment, duplicates, and recovery.
-`attach_mock` rejects live URLs. No live Strava photo upload was performed for this
-project. Automatic card attachment is outside v0.1.0.
+`attach_mock` rejects live URLs. Automatic attachment and source muscle highlighting were verified in the v0.2.0
+implementation; see the main README and validation notes.
 
 Inter retains its SIL Open Font License. Most artwork is MIT licensed; the adapted
 carrier illustration is CC BY-SA 4.0 with its bundled attribution notice.

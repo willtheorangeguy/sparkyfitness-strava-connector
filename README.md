@@ -7,20 +7,29 @@ reads SparkyFitness without modifying it. Based on
 using Strava's documented [strength JSON uploads](https://developers.strava.com/docs/uploads/#json---strength-training-limited).
 Targets SparkyFitness v1.8.0, pinned by the sibling addon harness.
 
-Download the setup files from [release v0.1.0](https://github.com/willtheorangeguy/sparkyfitness-strava-connector/releases/tag/v0.1.0).
+Download the setup files from [release v0.2.0](https://github.com/willtheorangeguy/sparkyfitness-strava-connector/releases/tag/v0.2.0).
 The release workflow publishes regular/media images and attaches version-matched
 Compose and environment downloads.
 
 ## Selection rules
 
+- Export only native SparkyFitness workouts (`source: sparky` or the API's
+  native default `manual`). Exclude Garmin and other provider imports, including
+  native groups containing imported exercises. Entries with no source evidence
+  are excluded. Imported workouts never require exercise mappings.
 - Export grouped workout instances linked to a preset or plan, keeping separate
   instances separate even on the same day.
 - Combine ungrouped plan logs by plan template, scheduled session (session index
   or weekday), and diary date. Skip unresolved assignments rather than guessing.
 - Exclude standalone exercises, unlinked freeform workouts, and prescribed templates.
-- Export only sets with a completion timestamp. Wait five minutes after the latest
-  completion and recorded end; exclude future workouts and empty workouts.
-- Skip missing/invalid timing with a reason in preview. Corrected source data can
+- Export only sets with a completion timestamp; unfinished sets remain excluded. Wait five
+  minutes after the latest completion and activity end; exclude future and empty workouts.
+- Prefer SparkyFitness's `total_duration_minutes` for the activity duration. This
+  is the sum of exercise durations, and may exclude pauses. Use the earliest
+  recorded exercise start; if all starts are missing, estimate the start as the
+  final set completion minus the reported total. No individual set times are uploaded.
+- Skip missing/invalid timing when neither a recorded start nor an estimated
+  start is available, with a reason in preview. Corrected source data can
   become eligible later. Block the whole workout for unmapped/invalid completed sets.
 
 **Partial workouts export once.** Later completed sets report `changed`; they are
@@ -31,16 +40,18 @@ directly, including positive added bodyweight loads; never add body mass. Unload
 bodyweight sets omit load. Negative assistance, distance sets, unknown modalities,
 invalid numbers, and fractional repetitions are blocked. Timed sets use seconds.
 
-Activity timing spans earliest recorded exercise start through latest recorded end
-or completion. `WORKOUT_TIMEZONE` interprets local times; ambiguous/nonexistent DST
+Without a reported total, activity timing spans earliest recorded exercise start
+through latest recorded end or completion. `WORKOUT_TIMEZONE` interprets local times; ambiguous/nonexistent DST
 times are skipped. Completion times are not mislabeled as set start times. Workout
-and exercise notes appear in descriptions. Calories, GPS, heart rate, RPE/RIR,
+start timestamps are serialized in UTC with a `Z` suffix: live Strava processing
+rejects the otherwise equivalent `+00:00` form. Fractional seconds are preserved.
+Workout and exercise notes appear in descriptions. Calories, GPS, heart rate, RPE/RIR,
 supersets, and rest targets are not uploaded as structured metrics.
 
 ## Docker setup
 
 The connector is an always-running companion service to SparkyFitness. After
-one-time authorization and exercise mapping, run
+one-time authorization, run
 `docker compose up -d` to start `watch`. Keep it running
 alongside SparkyFitness; daily manual sync
 commands are unnecessary. The existing-stack overlay runs the same watcher on the
@@ -50,7 +61,7 @@ The watcher checks immediately, then every `SYNC_INTERVAL_SECONDS` (900 seconds)
 It automatically uploads newly eligible preset/plan workouts after the five-minute
 settling period, then polls Strava until processing finishes. Defaults normally
 mean 5–20 minutes after the last completion/recorded end. Your completed-set-only
-selection remains in effect: unfinished sets are omitted, and later completed sets
+selection remains in effect for native workouts: unfinished sets are omitted, and later completed sets
 do not update an activity already exported.
 
 Temporary main-service/Strava API failures are retried on later cycles.
@@ -88,15 +99,30 @@ validates the nonce, its 15-minute expiry, and scopes. Tokens persist and rotate
 ```sh
 docker compose run --rm connector check
 docker compose run --rm connector preview
-docker compose run --rm connector exercises
-docker compose run --rm connector map EXERCISE_UUID BARBELL_BENCH_PRESS
-docker compose run --rm connector mappings
 docker compose run --rm connector sync
 docker compose up -d
 ```
 
-Replace `EXERCISE_UUID` with an ID from preview. Mappings explicitly approve an
-identifier from the inherited 656-exercise Strava catalog; names are never guessed.
+Exercises match automatically against the bundled 656-exercise Strava catalog
+using normalized names and common library aliases. Preview's `exercise_mappings`
+lists each chosen `strava_type` and its matching `method`: `catalog`, `alias`, or
+`manual`. Some aliases use a broader supported category where Strava lacks the
+exact variation (for example, Pec Static Stretch uses `STRETCH`). Garmin and other
+imports remain excluded before matching.
+
+Manual overrides are optional and take priority over automatic matches:
+
+```sh
+docker compose run --rm connector exercises
+docker compose run --rm connector map EXERCISE_UUID BARBELL_BENCH_PRESS
+docker compose run --rm connector mappings
+```
+
+Replace `EXERCISE_UUID` with an ID from preview. `mappings` lists saved manual
+overrides; automatic matches are recalculated without writing overrides. Unknown
+or ambiguous names remain blocked rather than receiving a fuzzy guess. Preview
+lists their IDs in `missing`, names in `missing_exercises`, and a reason. Unmatched
+sets are omitted from the preview payload; the whole workout is held until resolved.
 Background sync defaults to 900 seconds, five-minute settling, and ten new uploads
 per cycle. Later cycles poll asynchronous jobs. One account/athlete per instance.
 Stop the background service before opening the same state with maintenance commands.
@@ -140,11 +166,16 @@ sparkyfitness-strava retry SESSION_KEY --confirm-no-activity
 ```
 
 Reconciliation verifies the external ID. Retry only after confirming no activity or
-processing upload exists; failed uploads need explicit retry too. Rate limits persist
+processing upload exists; failed uploads need explicit retry too. For a known upload
+ID, retry checks Strava's status and refuses successful or still-processing jobs.
+An approved retry keeps the workout identity and previous attempt history, but
+uses a fresh `.retryN.json` file identifier because Strava caches failed jobs by
+external ID. It revalidates the source on the next sync and never retries merely
+because the source was edited. Rate limits persist
 cooldowns, including next UTC day for daily exhaustion. Uncertain OAuth refresh needs
 reauthorization. Errors omit response bodies/secrets. The source client permits GET only.
 
-## Experimental cards and browser tools
+## Card previews and browser login
 
 ```sh
 docker compose -f compose.media.yaml run --rm preview
@@ -157,8 +188,8 @@ Preview writes synthetic SparkyFitness cards and 30 illustrated comparisons to
 `design/previews/`. Login opens `http://localhost:6080/vnc.html`; enter the printed
 viewer password and sign into Strava yourself, including MFA. Stop with Ctrl+C to
 persist cookies. Tunnel port 6080 over SSH for remote hosts. Keep profiles private.
-Automatic generation/attachment during production sync remains pending. The
-attachment helper rejects live Strava URLs. See [design notes](design/README.md).
+Automatic generation and attachment are available through the companion worker below.
+The separate mock test helper rejects live Strava URLs. See [design notes](design/README.md).
 
 ## Validation and releases
 
@@ -185,3 +216,26 @@ Results: `reports/junit.xml`. CI covers units, Compose, container smoke checks, 
 media; manual dispatch also runs the harness. Release workflows prepare regular/media
 amd64/arm64 images and setup downloads. See [RELEASING.md](RELEASING.md) and
 [VALIDATION.md](VALIDATION.md). MIT licensed; inherited assets retain their notices.
+
+## Automatic workout images
+
+Set `MEDIA_ENABLED=true` and `MEDIA_UNITS=lb` (or `kg`) in `.env`, then recreate the core connector. Each new successful export creates an immutable image job. The activity description also includes total external weight times repetitions; timed holds and unrecorded body weight add no volume.
+
+Download `docker-compose.media.yml` from the same release beside your standalone `.env`, then sign into the same Strava account once:
+
+```sh
+docker compose -f docker-compose.media.yml pull
+docker compose -f docker-compose.media.yml run --rm --service-ports media-login
+docker compose -f docker-compose.media.yml up -d media-worker
+docker compose -f docker-compose.media.yml run --rm --no-deps media-worker status
+```
+
+The standalone core connector must already have created its state volume. For an existing source stack, set `STRAVA_MEDIA_ENABLED=true` and `STRAVA_MEDIA_UNITS=lb` in that stack's environment, and set `CONNECTOR_STATE_VOLUME` beside the media Compose file to the actual `<stack>_strava_connector_state` volume name. For source-checkout builds, use `compose.media.yaml` in the commands above and build `media-worker` first.
+
+Stop `media-worker` before interactive login, and start it again afterwards. Browser cookies are separate from API OAuth. The companion shares the core state volume but never opens its SQLite database. It attaches two 1080 x 1080 cards generated from the exact exported sets, without changing activity fields. Missing muscle metadata is shown as unavailable. Existing exports are not backfilled automatically.
+
+Jobs and receipts persist under `/data/media`. An interrupted file selection or Save is held as `uncertain`; inspect the activity and receipt before any manual recovery. Never delete a receipt simply to retry an upload. Browser login expiry leaves new jobs pending; log in again to resume. Existing activity photos are held for review. API workout exports continue independently of browser failures.
+
+Automatic images are included in v0.2.0. Older releases provide only preview/login tools. The mock-only attachment helper retains its origin restriction.
+
+Muscle highlighting uses explicit source metadata: SparkyFitness's completed-exercise snapshots or wger's exercise-info API (`muscles` and `muscles_secondary`). Source names and Latin anatomy names are translated into the diagram's regions. Primary takes precedence when an area is also secondary in another exercise. Uncompleted SparkyFitness exercises are excluded. Unknown names remain unhighlighted and are recorded under `unmapped_muscles` in the image job; wger metadata fetch failures are recorded under `unavailable_exercises` and do not block the workout upload. Previously attached image files are not rewritten automatically.

@@ -26,6 +26,8 @@ class Config:
     interval: int = 900
     settle: int = 300
     batch: int = 10
+    media_enabled: bool = False
+    media_units: str = "lb"
 
     def __post_init__(self):
         self.sparkyfitness_url = endpoint(self.sparkyfitness_url)
@@ -34,6 +36,8 @@ class Config:
             ZoneInfo(self.timezone)
         except KeyError:
             raise ValueError("WORKOUT_TIMEZONE must name an installed IANA timezone") from None
+        if self.media_units not in {"lb", "kg"}:
+            raise ValueError("MEDIA_UNITS must be lb or kg")
         if self.since:
             date.fromisoformat(self.since)
         if self.interval < 60 or self.settle < 0 or not 1 <= self.batch <= 100:
@@ -46,4 +50,5 @@ class Config:
                    e.get("SPARKYFITNESS_API_KEY", ""), e.get("STRAVA_CLIENT_ID", ""), e.get("STRAVA_CLIENT_SECRET", ""),
                    e.get("STRAVA_BASE_URL", "https://www.strava.com"), e.get("WORKOUT_TIMEZONE", "UTC"),
                    e.get("EXPORT_SINCE", ""), int(e.get("SYNC_INTERVAL_SECONDS", "900")),
-                   int(e.get("SETTLE_SECONDS", "300")), int(e.get("MAX_UPLOADS_PER_SYNC", "10")))
+                   int(e.get("SETTLE_SECONDS", "300")), int(e.get("MAX_UPLOADS_PER_SYNC", "10")),
+                   e.get("MEDIA_ENABLED", "false").lower() == "true", e.get("MEDIA_UNITS", "lb"))
