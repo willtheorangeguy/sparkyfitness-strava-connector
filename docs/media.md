@@ -11,7 +11,16 @@ docker compose -f compose.media.yaml up -d media-worker
 docker compose -f compose.media.yaml run --rm --no-deps media-worker status
 ```
 
-The standalone core connector must already have created its state volume. For an existing source stack, set `STRAVA_MEDIA_ENABLED=true` and `STRAVA_MEDIA_UNITS=lb` in that stack's environment, and set `CONNECTOR_STATE_VOLUME` beside the media Compose file to the actual `<stack>_strava_connector_state` volume name. For source-checkout builds, use `compose.media.yaml` in the commands above and build `media-worker` first.
+The standalone core connector must already have created its state volume. The source `compose.media.yaml` fixes the external volume name to `sparkyfitness-strava-connector_state`. For an existing source stack, enable `STRAVA_MEDIA_ENABLED=true` and `STRAVA_MEDIA_UNITS=lb`, then override the worker's external volume with the actual stack volume name.
+
+```yaml title="compose.media.override.yaml"
+volumes:
+  connector_state:
+    external: true
+    name: fitness_strava_connector_state
+```
+
+Replace `fitness_strava_connector_state` with the volume created by your stack. Add both `-f compose.media.yaml -f compose.media.override.yaml` to every media command for that deployment. This source file does not read `CONNECTOR_STATE_VOLUME`; that variable belongs to the release-oriented media example.
 
 Stop `media-worker` before interactive login, and start it again afterwards. Browser cookies are separate from API OAuth. The companion shares the core state volume but never opens its SQLite database. It attaches two 1080 x 1080 cards generated from the exact exported sets, without changing activity fields. Missing muscle metadata is shown as unavailable. Existing exports are not backfilled automatically.
 
