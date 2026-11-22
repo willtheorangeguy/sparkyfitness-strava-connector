@@ -1,7 +1,7 @@
 # Automatic workout cards, offline previews and interactive browser login.
 name: sparkyfitness-strava-media
 x-media: &media
-  image: ${CONNECTOR_IMAGE:-ghcr.io/willtheorangeguy/sparkyfitness-strava-connector}:${CONNECTOR_VERSION:-0.2.0}-media
+  image: ${CONNECTOR_IMAGE:-ghcr.io/willtheorangeguy/sparkyfitness-strava-connector}:${CONNECTOR_VERSION:-0.2.1}-media
   init: true
   shm_size: 1gb
 services:

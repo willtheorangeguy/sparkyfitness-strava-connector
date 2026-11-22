@@ -144,3 +144,10 @@ Final checks for the muscle fix: SparkyFitness core/harness 170 passed, wger cor
 ## Release v0.2.0
 
 Release includes native strength upload/recovery fixes and automatic workout images with source muscle highlights. Core/harness and browser verification are recorded above. Downloadable media setup now includes the persistent worker and configurable shared state volume. No production credentials or private runtime artifacts are packaged.
+
+## Release v0.2.1 — November 22, 2026
+
+Local validation passed 168 tests, including mock Strava responses with IDs near
+the signed 64-bit limit. The tests cover authorization against an existing
+account binding, account checks, and reconciliation by activity or upload ID.
+The local Windows run excluded the Docker integration and Linux browser tests.
