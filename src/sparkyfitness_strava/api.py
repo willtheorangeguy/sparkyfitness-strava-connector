@@ -14,6 +14,14 @@ class UnknownWrite(APIError):
     pass
 
 
+def strava_id(resource, kind):
+    if isinstance(resource, dict):
+        identifier = resource.get("id_str") or resource.get("id")
+        if identifier:
+            return str(identifier)
+    raise ValueError(f"Strava did not return the {kind} ID")
+
+
 class API:
     def __init__(self, base, state=None, headers=None, transport=None):
         self.base, self.state = base, state
@@ -149,9 +157,7 @@ class Strava(API):
             "client_id": self.config.client_id, "client_secret": self.config.client_secret,
             "grant_type": "authorization_code", "code": code})
         credentials = self.credentials(result)
-        if not isinstance(result.get("athlete"), dict) or not result["athlete"].get("id"):
-            raise ValueError("Strava did not return the authorized athlete ID")
-        athlete = str(result["athlete"]["id"])
+        athlete = strava_id(result.get("athlete"), "authorized athlete")
         self.state.bind("strava_athlete", athlete)
         self.state.set("oauth", credentials)
         self.state.set("refresh_uncertain", False)

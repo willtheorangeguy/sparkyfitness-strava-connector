@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
 import time
-from .api import APIError, UnknownWrite, SparkyFitness, Strava
+from .api import APIError, UnknownWrite, SparkyFitness, Strava, strava_id
 from .state import encode
 from .media.queue import enqueue, snapshot
 from .media.summary import formatted_volume
@@ -121,9 +121,9 @@ class Engine:
 
     def check(self):
         identity = self.source()
-        athlete = self.strava.call("GET", "/athlete")
-        self.state.bind("strava_athlete", str(athlete["id"]))
-        return {"sparkyfitness": identity, "strava_athlete": str(athlete["id"])}
+        athlete = strava_id(self.strava.call("GET", "/athlete"), "athlete")
+        self.state.bind("strava_athlete", athlete)
+        return {"sparkyfitness": identity, "strava_athlete": athlete}
 
     def finish(self, session, record, upload):
         if str(upload.get("external_id")) != record["external_id"]:
@@ -248,7 +248,7 @@ class Engine:
         activity = self.strava.call("GET", "/activities/" + str(int(activity_id)))
         if activity.get("external_id") != record["external_id"]:
             raise ValueError("Activity does not belong to this sparkyfitness session")
-        record.update(state="exported", activity_id=str(activity["id"]))
+        record.update(state="exported", activity_id=strava_id(activity, "activity"))
         self.state.save(session, record)
         self.queue_media(session, record)
         return record
