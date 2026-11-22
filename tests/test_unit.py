@@ -5,6 +5,7 @@ import pytest
 from sparkyfitness_strava.api import API, APIError, Strava, UnknownWrite
 from sparkyfitness_strava.cli import complete_callback
 from sparkyfitness_strava.config import Config
+from sparkyfitness_strava.engine import Engine
 from sparkyfitness_strava.state import State
 from sparkyfitness_strava.workout import EXERCISES, build
 
@@ -84,6 +85,55 @@ def test_oauth_callback_checks_nonce_expiry_and_consent(tmp_path):
         with pytest.raises(ValueError, match="expired"):
             complete_callback(state, good)
     finally:
+        state.close()
+
+
+@pytest.mark.parametrize("id_format", ["numeric", "string", "both"])
+def test_strava_ids_survive_authorization_and_activity_reconciliation(tmp_path, id_format):
+    athlete_id = 9223372036854775807
+    activity_id = athlete_id - 2
+
+    def fields(identifier):
+        if id_format == "numeric":
+            return {"id": identifier}
+        if id_format == "string":
+            return {"id_str": str(identifier)}
+        return {"id": float(identifier), "id_str": str(identifier)}
+
+    def handler(request):
+        path = request.url.path
+        if path == "/oauth/token":
+            return httpx.Response(200, json={
+                "access_token": "access", "refresh_token": "refresh",
+                "expires_at": int(time.time()) + 3600, "athlete": fields(athlete_id),
+            })
+        if path == "/api/v3/athlete":
+            return httpx.Response(200, json=fields(athlete_id))
+        if path == f"/api/v3/activities/{activity_id}":
+            return httpx.Response(200, json={"external_id": "workout.json", **fields(activity_id)})
+        if path == "/api/v3/uploads/7":
+            return httpx.Response(200, json={
+                "id_str": "7", "external_id": "other.json", "activity_id": activity_id,
+            })
+        assert path == "/api/identity/user"
+        return httpx.Response(200, json={"activeUserId": "user", "authenticatedUserId": "user"})
+
+    config = Config(tmp_path, "https://sparkyfitness.test", "key", "client", "secret", "https://strava.test")
+    state = State(tmp_path)
+    strava = Strava(config, state, transport=httpx.MockTransport(handler))
+    sparkyfitness = API(config.sparkyfitness_url, transport=httpx.MockTransport(handler))
+    engine = Engine(config, state, sparkyfitness=sparkyfitness, strava=strava)
+    try:
+        state.bind("strava_athlete", str(athlete_id))
+        assert strava.authorize("code", "read,activity:write,activity:read_all") == str(athlete_id)
+        assert engine.check()["strava_athlete"] == str(athlete_id)
+        state.save("workout", {"state": "uncertain", "external_id": "workout.json"})
+        engine.reconcile_activity("workout", activity_id)
+        assert state.export("workout")["activity_id"] == str(activity_id)
+        state.save("polled", {"state": "uncertain", "external_id": "other.json"})
+        assert engine.reconcile("polled", 7)["activity_id"] == str(activity_id)
+    finally:
+        engine.close()
         state.close()
 
 

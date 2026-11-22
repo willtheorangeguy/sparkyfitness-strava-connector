@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 — 2026-11-22
+
+- Prefer Strava's `id_str` for athlete and activity IDs while supporting numeric IDs and existing connector state.
+
 ## 0.2.0 — 2026-10-21
 
 - Export only native SparkyFitness preset/plan workouts, excluding Garmin imports and unfinished sets.
